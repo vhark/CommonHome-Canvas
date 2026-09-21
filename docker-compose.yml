@@ -1,0 +1,65 @@
+# CommonHome Canvas — standalone.
+#
+# This file is deliberately self-contained: no external network, no reverse
+# proxy, no labels for one, no home automation server, no configuration
+# management. `docker compose up` in a fresh clone gives a working ambient
+# display on http://localhost:4174/ with no .env file and no API keys.
+#
+# Everything below is optional tuning. Delete nothing to get started.
+
+services:
+  canvas:
+    build: .
+    image: commonhome-canvas:local
+    container_name: commonhome-canvas
+    restart: unless-stopped
+
+    ports:
+      # host:container. Change the left side if 4174 is taken; the right side
+      # must match CANVAS_PORT.
+      - "${CANVAS_HOST_PORT:-4174}:4174"
+
+    # required: false is the point of this block. Compose treats a missing
+    # env_file as a fatal error by default, which would mean a fresh clone
+    # fails to start until someone creates a file full of blanks — exactly the
+    # friction this image exists to remove. Copy .env.example to .env only if
+    # you actually want an integration.
+    env_file:
+      - path: .env
+        required: false
+
+    environment:
+      # Defaults that make the container reachable. Anything set in .env wins.
+      CANVAS_PORT: "4174"
+      CANVAS_HOST: "0.0.0.0"
+      CANVAS_DATA_DIR: "/data"
+      # The display is reached on the host's own name as well as loopback;
+      # without this a browser on another machine gets a 403 from the Host
+      # allowlist. Add your own hostname or LAN IP via CANVAS_ALLOWED_HOSTS
+      # in .env.
+      CANVAS_ALLOWED_HOSTS: "${CANVAS_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,host.docker.internal,canvas}"
+
+    volumes:
+      # A named volume rather than a bind mount: no host path to guess, and it
+      # survives `docker compose down` (use `down -v` to discard it).
+      - canvas-data:/data
+
+    healthcheck:
+      # Duplicated from the image so `docker compose ps` reports health even
+      # when someone builds with a different base.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4174/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    # A display server reads its config at boot and then only makes outbound
+    # GETs. It has no reason to write anywhere but /data.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  canvas-data:

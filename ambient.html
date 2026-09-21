@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CommonHome</title>
+  </head>
+  <body>
+    <!-- Photo and scrim sit behind everything, outside the grid. -->
+    <div class="photo"></div>
+    <div class="scrim"></div>
+
+    <main class="dash">
+      <!-- Who is home: quiet, top-left. -->
+      <div class="top-left zone presence"></div>
+
+      <!-- Weather renders ONCE, here, with its source credited beneath it. -->
+      <div class="top-right scrimmed">
+        <div class="temp"></div>
+        <div class="condition"></div>
+        <div class="credit weather-credit"></div>
+      </div>
+
+      <!-- Centre: the day's quote, attributed. No clock (the Shelf bar has
+           one), no date, no greeting - the image carries the screen and the
+           words earn their place by being few. -->
+      <div class="centre scrimmed">
+        <div class="quote-text"></div>
+        <div class="quote-author"></div>
+      </div>
+
+      <!-- One focal element: the next commitment, or nothing at all. -->
+      <div class="focal scrimmed">
+        <div class="focal-label"></div>
+        <div class="focal-value"></div>
+      </div>
+
+      <!-- Diagnostics: absent unless something is actually wrong. -->
+      <div class="bottom-left zone health"></div>
+
+      <!-- Photo credit: smallest thing on screen, furthest corner. -->
+      <div class="bottom-right photo-credit"></div>
+    </main>
+
+    <script type="module" src="/spikes/ambient.ts"></script>
+  </body>
+</html>

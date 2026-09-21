@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CommonHome Canvas — a household display that runs in your house</title>
+<meta name="description" content="A privacy-first, self-hosted household ambient display. Credentials stay on the server, the display makes no outbound writes, and there is no account. An early prototype, and it says so.">
+
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="CommonHome Canvas — a household display that runs in your house">
+<meta property="og:description" content="Self-hosted ambient display. No account, no cloud tenancy, no third party in the data path. An early prototype, and it says so.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="top">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="CommonHome Canvas home">
+      <img class="mark" src="assets/favicon.svg" width="32" height="32" alt="">
+      <span class="brand-name"><span class="of">CommonHome</span> Canvas</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#ambient">The display</a>
+      <a href="#install">Install</a>
+      <a href="#architecture">How it works</a>
+      <a href="#status">Where it stands</a>
+      <a href="https://github.com/vhark/CommonHome-Canvas" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Early prototype · self-hosted · AGPL-3.0-or-later</p>
+      <h1>A household display<span class="lb"> </span>that runs in your house,<span class="lb"> </span>not in someone&nbsp;else's.</h1>
+      <p class="lede">
+        Canvas drives a calm screen on a wall or a television from hardware you
+        own. No account, no cloud tenancy, no third party in the data path. One
+        command starts it, and it needs no configuration to do something useful.
+      </p>
+      <p class="lede">
+        It is an early prototype. One part of it — the ambient photo display —
+        runs every day on a real household television. The rest is a tested
+        model layer with no editor in front of it yet. This page distinguishes
+        between the two rather than averaging them.
+      </p>
+      <div class="cta-row">
+        <a class="btn" href="#install">Run it</a>
+        <a class="btn-quiet" href="#status">See exactly where it stands</a>
+      </div>
+      <p class="fineprint">
+        Every capability claimed below is implemented in the repository and
+        covered by tests you can run yourself. Anything not yet built is listed
+        as planned, in the same table, rather than left off the page.
+      </p>
+    </div>
+  </section>
+
+  <!-- WHAT IT IS / WHO IT IS FOR -->
+  <section id="what" class="band">
+    <div class="wrap">
+      <h2>What Canvas is</h2>
+      <p class="section-lede">
+        A display server, a portable document format for screens, and one
+        working screen built on top of them.
+      </p>
+
+      <div class="grid-3">
+        <article class="card">
+          <div class="card-num">01</div>
+          <h3>A screen, not a control panel</h3>
+          <p>
+            A household display is a shared surface. Everyone in the house sees
+            it, and so does every visitor. Canvas is built to be read from
+            across a room and ignored the rest of the time — not to be poked at.
+          </p>
+          <p>
+            The snapshot endpoint issues GETs and exposes no way to call a
+            service. A compromised display cannot actuate anything in the house,
+            because there is no code path that would let it.
+          </p>
+        </article>
+        <article class="card">
+          <div class="card-num">02</div>
+          <h3>Documents you can read</h3>
+          <p>
+            Screens are plain JSON — hand-editable, diffable, and version
+            controllable. Unknown fields and unknown block types written by a
+            newer build survive a load and save cycle by an older one, so a
+            document shared between two households does not rot.
+          </p>
+          <p class="card-meta"><a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/02-canvas-document-format.md" rel="noopener">docs/02 — document format</a></p>
+        </article>
+        <article class="card">
+          <div class="card-num">03</div>
+          <h3>Who it is for</h3>
+          <p>
+            Someone who already runs a container or two at home, wants a wall
+            display, and would rather not hand their household's photos,
+            calendar and presence to a subscription. You need a machine, a
+            screen, and a willingness to read a README.
+          </p>
+          <p>
+            If you want a finished product with an editor, Canvas is not that
+            yet. Commercial dashboard products are.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY — plainly, never as badges -->
+  <section class="band band-ink">
+    <div class="wrap narrow">
+      <h2>Where the data actually goes</h2>
+      <p class="big-plain">
+        Canvas is self-hosted. It runs as a single container on hardware you
+        own, keeps its state in a volume you control, and has no account with
+        anyone. There is no telemetry and no analytics in the codebase.
+      </p>
+      <p class="big-plain">
+        Credentials never reach the browser. If you connect a home automation
+        server or a photo provider, the server process holds those tokens,
+        calls those APIs itself, and returns only the shaped fields the screen
+        renders. The page never sees a token, an entity id, or a raw upstream
+        payload.
+      </p>
+      <p class="big-plain">
+        That is a real boundary and it is worth stating its limits: if you
+        configure an outside photo provider or weather source, Canvas makes
+        outbound requests to it from your server. That is not local processing
+        and this page will not describe it as such. Configure nothing and
+        Canvas talks to nobody — it starts and runs that way by default.
+      </p>
+    </div>
+  </section>
+
+  <!-- THE AMBIENT DISPLAY -->
+  <section id="ambient" class="band">
+    <div class="wrap">
+      <h2>The ambient display</h2>
+      <p class="section-lede">
+        The strongest thing Canvas does today, and the only part that has been
+        running unattended in a real house.
+      </p>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>A photo, a line, and the weather</h3>
+          <p>
+            Full-bleed photograph, a quote of the day with its attribution, and
+            current conditions. That is the whole screen. It is designed to be
+            glanced at, which means most of the design work went into what it
+            refuses to put on the wall.
+          </p>
+          <p>
+            Each data source degrades independently. A missing photo key means
+            no photo, not a blank screen; an unreachable automation server means
+            no house state, not an error page. The display keeps working with
+            whatever it still has.
+          </p>
+        </article>
+        <article class="card">
+          <h3>445 quotes, attributed honestly</h3>
+          <p>
+            The library ships 445 entries with hedged attributions — where a
+            line is widely misattributed, it says so rather than repeating the
+            confident version. Attribution is treated as an obligation, not a
+            caption.
+          </p>
+          <p>
+            Selection is author-spaced, so the same author never appears on two
+            consecutive days. A naive shuffle produced adjacent repeats often
+            enough to look broken, so ordering is computed rather than random.
+          </p>
+          <p class="card-meta"><a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/05-ambient-screen.md" rel="noopener">docs/05 — ambient screen</a></p>
+        </article>
+      </div>
+
+      <p class="fineprint">
+        The ambient screen is still a spike in the repository's own terms: it
+        does not yet use the canonical document model described below. It works,
+        and it is honest about being a prototype rather than the finished
+        architecture.
+      </p>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install" class="band band-soft">
+    <div class="wrap narrow">
+      <h2>Running it</h2>
+      <p class="section-lede">
+        Three ways, in the order we would recommend them. The container needs no
+        configuration and no API keys to start; every integration is optional.
+      </p>
+
+      <ol class="options">
+
+        <li>
+          <h3>Clone and compose</h3>
+          <p>
+            The default, because it is the one where you can read everything
+            before you run it. You get the source, the Dockerfile, and the
+            compose file in front of you, and nothing executes until you decide.
+          </p>
+          <div class="shell"><pre><span class="prompt">$</span> git clone https://github.com/vhark/CommonHome-Canvas.git
+<span class="prompt">$</span> cd canvas
+<span class="prompt">$</span> docker compose up</pre></div>
+          <p class="after">
+            Then open <code>http://localhost:4174/</code>. No <code>.env</code>
+            file is needed; the compose file treats one as optional on purpose,
+            so a fresh clone starts rather than failing on a file full of
+            blanks. Copy <code>.env.example</code> only if you want an
+            integration.
+          </p>
+        </li>
+
+        <li>
+          <h3>A single docker run</h3>
+          <p>
+            One command, no clone, nothing written to your working directory
+            except a named volume. Useful for trying it on a spare machine.
+          </p>
+          <div class="shell"><pre><span class="prompt">$</span> docker run --rm -p 4174:4174 ghcr.io/vhark/commonhome-canvas:latest</pre></div>
+          <div class="opt-note">
+            <p>
+              <strong>Not published yet.</strong> There is no image on a public
+              registry at the time of writing, so the command above will fail.
+              Until one is pushed, the equivalent is a clone and a local build:
+            </p>
+            <div class="shell"><pre><span class="prompt">$</span> docker build -t commonhome-canvas .
+<span class="prompt">$</span> docker run --rm -p 4174:4174 commonhome-canvas</pre></div>
+          </div>
+        </li>
+
+        <li>
+          <h3>The convenience script</h3>
+          <p>
+            There is an install script that does the above for you. The usual
+            way to run it is to pipe it straight into a shell, and the usual way
+            is worth thinking about for a moment first.
+          </p>
+          <div class="opt-note">
+            <p>
+              <strong>Piping a script to a shell means trusting the source
+              completely</strong> — the server that answers that URL, the TLS
+              chain to it, and whoever can change what it returns. It is not
+              worse than any other way of running someone else's code, but it is
+              the only one where you never see the code.
+            </p>
+            <p>
+              So download it, read it, then run it. It is short, and the point
+              of publishing it is that you can check it.
+            </p>
+          </div>
+          <div class="shell"><pre><span class="prompt">$</span> curl -fsSL https://raw.githubusercontent.com/vhark/CommonHome-Canvas/main/scripts/install.sh -o install.sh
+<span class="prompt">$</span> less install.sh
+<span class="prompt">$</span> sh install.sh</pre></div>
+          <p class="after">
+            If you have read it once and want the one-liner afterwards, it is
+            <code>curl -fsSL https://raw.githubusercontent.com/vhark/CommonHome-Canvas/main/scripts/install.sh | sh</code>.
+            We are not going to pretend we do not know you will use it; we would
+            rather the caveat was on the same page.
+          </p>
+        </li>
+
+      </ol>
+
+      <p class="fineprint">
+        Canvas has zero runtime dependencies. The container ships the display
+        and a standalone Node HTTP server and nothing else — no node_modules, no
+        build toolchain, no package manager invoked at runtime. It runs
+        read-only, as a non-root user, with no new privileges.
+      </p>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture" class="band">
+    <div class="wrap">
+      <h2>How it works, briefly</h2>
+      <p class="section-lede">
+        Two bodies of code that do not import each other, and one boundary
+        between the household's credentials and the screen.
+      </p>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>The canonical model</h3>
+          <p>
+            <code>src/canvas/</code> holds the real core: the portable document
+            schema, named density levels at 6, 12 and 24 columns, declared block
+            footprints, and a pure deterministic reflow function. No I/O, no
+            DOM, no clock, no randomness.
+          </p>
+          <p>
+            Covered by 50 passing tests including property tests for round-trip,
+            idempotence, containment and preservation. It is a model layer: no
+            UI, no editor, no persistence.
+          </p>
+          <p class="card-meta"><a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/04-grid-density.md" rel="noopener">docs/04 — grid density</a></p>
+        </article>
+        <article class="card">
+          <h3>The server</h3>
+          <p>
+            A standalone Node HTTP server using only the standard library. It
+            serves the built display, answers a health check that never depends
+            on an integration being configured, and exposes one read-only
+            snapshot endpoint.
+          </p>
+          <p>
+            Configuration is entirely environment-driven, with a host allowlist
+            and no household value left in the source.
+          </p>
+          <p class="card-meta"><a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/01-architecture.md" rel="noopener">docs/01 — architecture</a></p>
+        </article>
+        <article class="card">
+          <h3>The spikes</h3>
+          <p>
+            <code>spikes/</code> holds disposable experiments: a grid engine
+            comparison harness and the ambient screen. The repository says so in
+            the first line of the files themselves rather than in a footnote.
+          </p>
+          <p>
+            They are scheduled for removal once they have answered the questions
+            they were written to answer. The ambient screen graduates when it is
+            rebuilt on the canonical model.
+          </p>
+          <p class="card-meta"><a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/07-design-principles.md" rel="noopener">docs/07 — design principles</a></p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- HONEST STATUS -->
+  <section id="status" class="band band-soft">
+    <div class="wrap narrow">
+      <h2>Where this actually stands</h2>
+      <p class="section-lede">
+        This mirrors the table in the repository's README. If the two ever
+        disagree, the README is correct and this page is out of date.
+      </p>
+
+      <div class="table-scroll">
+        <table class="status-table">
+          <thead>
+            <tr><th scope="col">Area</th><th scope="col">Status</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Canonical document schema, load, validate, save, round-tripping</td>
+              <td class="state"><span class="dot live" aria-hidden="true"></span>Working</td>
+            </tr>
+            <tr>
+              <td>Named density levels and pure deterministic reflow</td>
+              <td class="state"><span class="dot live" aria-hidden="true"></span>Working</td>
+            </tr>
+            <tr>
+              <td>Declared named block sizes per density, with a queryable picker set</td>
+              <td class="state"><span class="dot live" aria-hidden="true"></span>Working</td>
+            </tr>
+            <tr>
+              <td>Standalone server, health check, read-only snapshot endpoint</td>
+              <td class="state"><span class="dot live" aria-hidden="true"></span>Working</td>
+            </tr>
+            <tr>
+              <td>Container that runs with no configuration</td>
+              <td class="state"><span class="dot live" aria-hidden="true"></span>Working</td>
+            </tr>
+            <tr>
+              <td>Ambient photo screen with quote, weather and attribution</td>
+              <td class="state"><span class="dot partial" aria-hidden="true"></span>Prototype</td>
+            </tr>
+            <tr>
+              <td>Server-side adapter holding credentials, shaped snapshot</td>
+              <td class="state"><span class="dot partial" aria-hidden="true"></span>Prototype</td>
+            </tr>
+            <tr>
+              <td>Grid engine selected for the eventual editor</td>
+              <td class="state"><span class="dot designed" aria-hidden="true"></span>Decided, not integrated</td>
+            </tr>
+            <tr>
+              <td>Interactive editor</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+            <tr>
+              <td>Persistence, drafts, immutable publishing</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+            <tr>
+              <td>Registered displays, pairing, offline continuity</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+            <tr>
+              <td>Loops and schedules</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+            <tr>
+              <td>Authentication, API surface</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+            <tr>
+              <td>Block catalogue, sharing, analytics</td>
+              <td class="state"><span class="dot none" aria-hidden="true"></span>Planned</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="big-plain">
+        <strong>Working</strong> means implemented in this repository and
+        covered by tests you can run yourself. It does not mean
+        production-ready. There is no editor, no database, no authentication, no
+        publishing and no display pairing. Do not run this as a service you
+        depend on.
+      </p>
+      <p class="fineprint">
+        The gap between the tested model layer and the working screen is the
+        project's main structural risk — they are not yet the same system. That
+        is tracked in the open rather than smoothed over.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-in">
+    <div>
+      <img class="mark" src="assets/favicon.svg" width="28" height="28" alt="">
+      <p class="footer-note">
+        CommonHome Canvas — an open-source household display.<br>
+        AGPL-3.0-or-later. Built in a real house, documented as it goes.
+      </p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="https://github.com/vhark/CommonHome-Canvas" rel="noopener">Source</a>
+      <a href="https://github.com/vhark/CommonHome-Canvas/blob/main/docs/README.md" rel="noopener">Documentation</a>
+      <a href="https://github.com/vhark/CommonHome-Canvas/blob/main/README.md#status-prototype" rel="noopener">Prototype status</a>
+      <a href="https://github.com/vhark/CommonHome-Canvas/blob/main/LICENSE" rel="noopener">Licence</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

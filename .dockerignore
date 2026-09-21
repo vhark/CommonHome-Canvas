@@ -1,0 +1,35 @@
+# Keep the build context to what the image actually needs.
+#
+# .planning/ alone is ~3,600 files and ~900 PNGs of design evidence. Shipping
+# it to the daemon on every build costs seconds and megabytes for material the
+# image never reads — and it is also where household-identifying material
+# lives, which has no business inside a published container.
+
+.git
+.gitignore
+.github
+.hermes
+.planning
+docs
+node_modules
+dist
+test-results
+playwright-report
+.playwright
+tests
+**/*.test.ts
+**/*.test.mjs
+*.sqlite*
+__pycache__
+**/*.py
+
+# Local compose state and secrets: an .env copied into the image would bake
+# one household's credentials into a distributable artifact.
+.env
+.env.*
+!.env.example
+docker-compose*.yml
+Dockerfile
+README.md
+PRE-PUBLICATION.md
+LICENSE

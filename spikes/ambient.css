@@ -1,0 +1,263 @@
+/* CommonHome Canvas — ambient screen SPIKE.
+ *
+ * Reimplements the ambient-dashboard techniques studied in Momentum Dash from
+ * measured values. Momentum is proprietary; nothing here is copied from its
+ * stylesheet. The TECHNIQUES - layered non-uniform scrim, per-element blurred
+ * shadow, alpha ladder instead of colour for hierarchy - are general and are
+ * rebuilt in our own tokens.
+ *
+ * Viewing distance drives every size. This is a 4K panel at scale 2 (a
+ * 1920x1080 logical viewport) read from roughly three metres, so type is
+ * scaled well beyond desktop norms and the size contrast between the clock and
+ * the smallest credit is about 12:1.
+ */
+
+:root {
+  /* Hearth night, from CommonHome design/tokens/colors.css. The photo carries
+   * the colour; these are the fallback ground and the one accent. */
+  --canvas: #12100E;
+  --accent: #C97B4A;
+
+  /* One text colour at several alphas. Hierarchy comes from size, position and
+   * opacity - never from hue. Coloured text over an arbitrary photo is both
+   * unreadable and restless. */
+  --text: #FFFFFF;
+  --a-primary: 1;
+  --a-secondary: 0.85;
+  --a-tertiary: 0.70;
+  --a-quiet: 0.50;
+
+  --focal: 64px;
+  --label: 15px;
+  --credit: 17px;
+
+  --edge: 44px;
+
+  /* Slow and uniform. Nothing on an ambient screen should move quickly enough
+   * to pull the eye from across a room. */
+  --fade: 0.5s ease;
+  --photo-fade: 2s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* The fallback ground colour lives ONLY on the root element.
+ *
+ * .photo sits at z-index -2 as a child of body. An element with a negative
+ * z-index paints behind its parent's background, so giving body an opaque
+ * background hides the photo completely while every DOM property still reports
+ * it as loaded and fully opaque - the image is painted, then covered. body
+ * stays transparent and html carries the colour that shows when no photo has
+ * loaded yet. */
+html { background: var(--canvas); }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Deliberately light. A heavy text-shadow is what reads as "in your face";
+   * this only stops white text shimmering on a bright patch of photo. */
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ----------------------------------------------------------- photo layer */
+
+.photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity var(--photo-fade);
+}
+.photo.loaded { opacity: 1; }
+
+/* The scrim is deliberately NOT a flat wash.
+ *
+ * A uniform dark layer kills the photo and still fails behind bright skies. A
+ * non-uniform scrim darkens three specific places instead: the corners, where
+ * small credits sit; the bottom edge, which photos tend to render brightest;
+ * and a soft ellipse behind the centre column, sized to sit under the clock.
+ * Peak darkening is 35% at the corners and 26% behind the text, leaving the
+ * mid-flanks of the image untouched. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 60% 22% at 50% 96%, rgba(0,0,0,0.26) 0%, rgba(0,0,0,0.02) 60%, transparent 75%),
+    radial-gradient(ellipse 100% 40% at 50% 100%, rgba(0,0,0,0.30), transparent 55%),
+    radial-gradient(circle 38% at 0% 0%, rgba(0,0,0,0.35), transparent 40%),
+    radial-gradient(circle 38% at 100% 0%, rgba(0,0,0,0.35), transparent 40%),
+    radial-gradient(circle 38% at 0% 100%, rgba(0,0,0,0.35), transparent 40%),
+    radial-gradient(circle 38% at 100% 100%, rgba(0,0,0,0.35), transparent 40%);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+/* Three columns by five rows. The centre column holds the whole reading stack;
+ * everything else is pushed into the edge bands. The empty space is the
+ * design, not a gap waiting to be filled - it is what separates an ambient
+ * screen from a dashboard. */
+.dash {
+  position: relative;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  padding: var(--edge);
+  gap: 0;
+}
+
+.top-left    { grid-area: 1 / 1; justify-self: start;  align-self: start; }
+.top-right   { grid-area: 1 / 3; justify-self: end;    align-self: start; text-align: right; }
+/* The quote sits at the BOTTOM of the screen, on the same baseline band as
+ * the photo credit - a caption line, not a centrepiece. Everything above the
+ * bottom band is photograph. */
+.centre      { grid-area: 5 / 2; justify-self: center; align-self: end; text-align: center; }
+.bottom-left { grid-area: 5 / 1; justify-self: start;  align-self: end; }
+.bottom-right{ grid-area: 5 / 3; justify-self: end;    align-self: end; text-align: right; }
+
+/* Legibility bought locally instead of globally.
+ *
+ * Rather than darkening the whole photo until text works anywhere, each text
+ * cluster drags a soft blurred shadow behind itself. The photo stays bright
+ * where there is nothing to read. */
+.scrimmed { position: relative; }
+.scrimmed::before {
+  content: '';
+  position: absolute;
+  inset: -40px -56px;
+  border-radius: calc(40% + 1.5rem);
+  background: #000;
+  filter: blur(40px);
+  opacity: 0.25;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ---------------------------------------------------------- centre: quote */
+
+/* The centre holds the day's quote and nothing else. The clock left this
+ * screen deliberately: the Shelf bar already shows one, and a 240px clock was
+ * the loudest thing on what is supposed to be a picture. Sized for reading at
+ * three metres but well under the old clock's weight - the image is the
+ * subject now, the words are a caption to the day. */
+.quote-text {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 36px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.25;
+  max-width: 1150px;
+  opacity: var(--a-primary);
+}
+
+/* Attribution doctrine applies to words: every quote names its author, at the
+ * same quiet weight as the data credits. An em-dash prefix marks it as a
+ * byline without needing a second colour. */
+.quote-author {
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: var(--a-tertiary);
+  margin-top: 6px;
+}
+.quote-author::before { content: '\2014\00a0'; }
+.quote-author:empty { display: none; }
+.quote-author:empty::before { content: none; }
+
+/* The focal slot (next commitment) sits at the bottom of the empty middle,
+ * just above the quote cluster - part of the caption band, not a second
+ * centrepiece. */
+.focal {
+  grid-area: 4 / 2;
+  justify-self: center;
+  align-self: end;
+  text-align: center;
+  max-width: 1100px;
+  padding-bottom: 10px;
+}
+.focal-label {
+  font-size: var(--label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: var(--a-quiet);
+  margin-bottom: 14px;
+}
+.focal-value {
+  font-size: var(--focal);
+  font-weight: 400;
+  line-height: 1.2;
+  opacity: var(--a-secondary);
+}
+
+/* ------------------------------------------------------------ edge bands */
+
+.zone {
+  font-size: var(--credit);
+  font-weight: 400;
+  opacity: var(--a-tertiary);
+  line-height: 1.5;
+}
+
+.temp {
+  font-size: 46px;
+  font-weight: 400;
+  opacity: var(--a-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.condition {
+  font-size: 22px;
+  font-weight: 400;
+  opacity: var(--a-tertiary);
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------- attribution */
+
+/* Attribution is first-class: it sits WITH the thing it credits, not in a
+ * footnote. The weather source renders directly beneath the weather it
+ * describes, so the relationship needs no explaining. It is quiet - 17px at
+ * 50% - but it is always present, because a household should be able to see
+ * where a number came from. */
+.credit {
+  font-size: var(--credit);
+  font-weight: 400;
+  opacity: var(--a-quiet);
+  letter-spacing: 0.01em;
+  margin-top: 8px;
+}
+.credit a { color: inherit; text-decoration: none; }
+
+/* Smallest element on the screen, furthest corner. */
+.photo-credit {
+  font-size: var(--credit);
+  font-weight: 400;
+  opacity: var(--a-quiet);
+  letter-spacing: 0.01em;
+}
+
+/* A diagnostic, so it is ABSENT rather than dim when there is nothing wrong.
+ * A TV cannot be hovered, so the disclosure is conditional instead. */
+.health {
+  font-size: var(--label);
+  opacity: var(--a-quiet);
+  margin-top: 10px;
+  color: var(--accent);
+}
+.health:empty { display: none; }
+
+/* Content swaps fade; nothing slides or scales. */
+.fade { transition: opacity var(--fade); }
+.fade.out { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

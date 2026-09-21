@@ -1,0 +1,35 @@
+<!-- CommonHome Canvas mark.
+     A variation on the CommonHome egg, not a new logo: same 64x64 frame, same
+     16px corner radius, same ink field, same hearth amber, same 15px radius
+     circle at the same optical centre. The family resemblance is the point.
+
+     What differs is one idea: the egg sits behind a frame. Canvas is the
+     surface a household arranges things on, so the mark shows the egg seen
+     through a canvas - two hairline rules crossing it, the way a layout grid
+     falls across a photograph. The circle stays whole and on top; the grid
+     never cuts it. Content first, structure second, which is the same
+     argument the ambient screen makes by keeping the photo as the focal
+ point.
+
+ Rules use the moon-3 token, not the hairline token. Hairline is right for
+ UI chrome that should recede, but at favicon size it vanished and the
+ mark collapsed into a plain egg. Checked by rendering at 160/64/32/16px
+ on both paper and night, not by reading the markup.
+
+ (Token names appear here without their CSS double-dash prefix: that
+ sequence is illegal inside an XML comment and a strict parser rejects the
+ file, even though browsers accept it.) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CommonHome Canvas">
+  <rect width="64" height="64" rx="16" fill="#1D1F1E"/>
+  <!-- The canvas: a frame inset from the tile, drawn in the same hairline
+       weight the design system uses for structure that should recede. -->
+  <rect x="12" y="12" width="40" height="40" rx="6"
+        fill="none" stroke="#858985" stroke-width="2.5"/>
+  <!-- Grid rules. Placed off-centre on purpose: a dead-centre cross reads as
+       a target or a plus sign, and this is a layout, not a symbol of
+       addition. -->
+  <path d="M12 27.5 H52 M27.5 12 V52" stroke="#858985" stroke-width="2"
+        stroke-linecap="round" opacity="0.9"/>
+  <!-- The egg, unchanged and unbroken, sitting on top of the structure. -->
+  <circle cx="32" cy="36" r="15" fill="#E3A33F"/>
+</svg>

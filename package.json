@@ -1,0 +1,31 @@
+{
+  "name": "commonhome-canvas-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/server/main.ts",
+    "dev:spike": "vite --host 127.0.0.1 --port 4173 --strictPort",
+    "build": "node spikes/build.mjs",
+    "test:spike": "playwright test tests/spike.spec.ts",
+    "test:storage": "node --test spikes/storage.test.ts",
+    "test:model": "node --test spikes/model.test.ts",
+    "build:ambient": "node spikes/build-ambient.mjs",
+    "dev:ambient": "vite --config vite.ambient.config.ts",
+    "test:ambient": "node --test spikes/ambient-model.test.ts",
+    "test:canvas": "node --test src/canvas/",
+    "test:server": "node --test src/server/"
+  },
+  "devDependencies": {
+    "gridstack": "13.2.0",
+    "react-grid-layout": "2.2.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "vite": "8.2.2",
+    "@playwright/test": "1.63.0",
+    "@axe-core/playwright": "4.13.0"
+  }
+}

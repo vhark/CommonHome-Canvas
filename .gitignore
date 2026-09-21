@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.playwright/
+test-results/
+playwright-report/
+*.sqlite*
+__pycache__/
+
+# Temporary LAN-serving config for the Phase 1 real-touch checkpoint.
+# The committed vite.config.ts stays loopback-only; delete this once tablet
+# evidence is captured.
+vite.touch.config.ts
