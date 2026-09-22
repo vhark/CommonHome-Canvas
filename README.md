@@ -6,6 +6,19 @@ room, an agenda in the kitchen, a status board in the hallway — and drive them
 from hardware the household owns, with no account, no cloud tenancy and no
 third party in the data path.
 
+**Put another way: Canvas is self-hosted digital signage, scoped to a home.**
+The problem is the same one signage software solves — compose a screen, put it
+on a display, keep it current — and the architecture is the same: a server
+that owns the content, and displays that render it. What differs is the
+threat model. Commercial signage assumes a business that accepts a cloud
+tenancy; a home screen shows who is out, what the family is doing tomorrow,
+and photographs of children, so the content must not leave the building.
+
+That framing also sets the honest limit. Canvas today drives **one** screen
+well. The fleet layer that signage implies — multiple displays managed
+centrally, scheduled rotation, playlists, remote updates — is designed but not
+built. See the status table below.
+
 Licence: **AGPL-3.0** (`LICENSE` is present in this repository).
 
 ---
@@ -50,10 +63,10 @@ you depend on.
 | Grid engine selected (GridStack 13.2.0) | **Decided, not integrated** | see `docs/01-architecture.md` |
 | Interactive editor | **Planned** | — |
 | Persistence, drafts, immutable publishing | **Planned** | — |
-| Registered displays, pairing, offline continuity | **Planned** | — |
-| Loops and schedules | **Planned** | — |
+| Registered displays, pairing, offline continuity (the signage "player" layer) | **Planned** | — |
+| Loops and schedules (signage "playlists" and dayparting) | **Planned** | — |
 | Authentication, API surface | **Planned** | — |
-| Packaging as a container / installable service | **Planned** | — |
+| Packaging as a container / installable service | **Working** | `Dockerfile`, `docker-compose.yml`, `scripts/install.sh` |
 
 "Working" here means: implemented in this repository and covered by tests you
 can run yourself with the commands below. It does not mean production-ready.
