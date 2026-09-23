@@ -312,7 +312,7 @@ test('no household value is hardcoded in the server sources', async () => {
     ['a hardcoded weather entity', /['"`]weather\.\w/],
     ['a developer home directory', /\/home\/\w/],
   ];
-  for (const file of ['server.ts', 'snapshot.ts', 'main.ts', 'config.ts']) {
+  for (const file of ['server.ts', 'snapshot.ts', 'main.ts', 'config.ts', 'store.ts', 'api.ts']) {
     const text = await readFile(new URL(file, here), 'utf8');
     for (const [label, pattern] of forbidden) {
       const hit = pattern.exec(text);

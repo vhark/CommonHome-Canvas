@@ -17,8 +17,14 @@
     "dev:ambient": "vite --config vite.ambient.config.ts",
     "test:ambient": "node --test spikes/ambient-model.test.ts",
     "test:canvas": "node --test src/canvas/",
+    "test:providers": "node --test src/providers/",
+    "test:render": "node --test src/render/",
+    "test:calendar": "node --test src/calendar/",
+    "test:calendar:live": "CANVAS_LIVE_TESTS=1 node --test src/server/calendar.live.test.ts",
     "test:server": "node --test src/server/"
   },
+  "//dependencies": "INTENTIONALLY EMPTY AND MUST STAY EMPTY. Canvas has zero runtime dependencies, which is what lets the container image ship with no node_modules and makes the supply chain for a screen in someone's kitchen inspectable in an afternoon. node:http, node:fs, node:crypto and node:path cover everything the server does. Adding one entry here changes the shape of the product.",
+  "dependencies": {},
   "devDependencies": {
     "gridstack": "13.2.0",
     "react-grid-layout": "2.2.4",

@@ -6,7 +6,27 @@ playwright-report/
 *.sqlite*
 __pycache__/
 
+# Throwaway verification probes.
+#
+# Kept only as a safety net. Probes should NOT be written to disk at all:
+# pipe them to node's stdin with absolute imports, so nothing is ever created
+# to forget about.
+#
+#   REPO=$PWD node --experimental-strip-types --input-type=module <<'PROBE'
+#   const R = process.env.REPO;
+#   const {AccessStore} = await import(`${R}/src/server/access.ts`);
+#   PROBE
+#
+# Gitignoring a probe file is not enough: verification tooling watches the
+# FILESYSTEM, not git, so a probe here still registers as an unverified
+# changed path and keeps re-firing for turns after it is deleted. Writing no
+# file is the only thing that actually fixes it.
+scratch/
+
 # Temporary LAN-serving config for the Phase 1 real-touch checkpoint.
 # The committed vite.config.ts stays loopback-only; delete this once tablet
 # evidence is captured.
 vite.touch.config.ts
+
+# Build artifacts from the private development repo must never land here.
+.planning/

@@ -32,6 +32,8 @@
  *    shaped data; tokens stay in this process.
  */
 
+import {createHash} from 'node:crypto';
+
 export type HomeAssistantConfig = {
   readonly url: string;
   readonly token: string;
@@ -52,11 +54,35 @@ export type CanvasConfig = {
   readonly baseUrl: string | null;
   readonly dataDir: string;
   readonly allowedHosts: readonly string[];
+  /* Escape hatch for the unauthenticated canvas API. See `apiAllowRemote`
+   * below and the header comment in api.ts. */
+  readonly apiAllowRemote: boolean;
   readonly homeAssistant: HomeAssistantConfig | null;
   readonly photos: PhotoConfig | null;
   readonly analytics: 'on' | 'off';
   readonly locale: string;
   readonly timeZone: string | null;
+  /* Subscribed ICS calendars, keyed by opaque id.
+   *
+   * Each entry's `url` is a BEARER CREDENTIAL - a calendar share link grants
+   * permanent read of that calendar to whoever holds it - so sources live
+   * here, server-side, and the browser only ever names an id. */
+  readonly calendars: readonly CalendarSourceConfig[];
+  /* How often a paired display re-checks its manifest, in seconds. Jitter is
+   * applied by the client on top of this, so six screens started by one power
+   * cut do not poll in lockstep. */
+  readonly screenPollSeconds: number;
+};
+
+/* One subscribed calendar. Mirrors CalendarSource in calendar.ts; declared
+ * here so config.ts does not import the server's calendar module. */
+export type CalendarSourceConfig = {
+  readonly id: string;
+  readonly label: string;
+  readonly url: string;
+  readonly level: 'private' | 'shared';
+  readonly showTitles: boolean;
+  readonly refreshMs: number;
 };
 
 export type ConfigProblem = {readonly key: string; readonly message: string};
@@ -170,16 +196,45 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): {
     problems.push({key: 'CANVAS_ANALYTICS', message: `expected on or off, got: ${analyticsRaw}`});
   }
 
+  /* The canvas API has no authentication yet, so remote access to it is opt
+   * in by an explicitly named variable rather than implied by a bind address.
+   * Anything but a literal `true` is off: a typo must fail closed. */
+  const apiAllowRemoteRaw = (env.CANVAS_API_ALLOW_REMOTE ?? '').trim().toLowerCase();
+  if (apiAllowRemoteRaw !== '' && apiAllowRemoteRaw !== 'true' && apiAllowRemoteRaw !== 'false') {
+    problems.push({
+      key: 'CANVAS_API_ALLOW_REMOTE',
+      message: `expected true or false, got: ${apiAllowRemoteRaw}; treating as false`,
+    });
+  }
+
   return {
     config: {
       port: port(env.CANVAS_PORT, 4174, problems),
-      /* Binds all interfaces by default because the normal deployment is a
-       * container, where loopback-only would make it unreachable. The host
-       * allowlist, not the bind address, is what limits who may talk to it. */
-      host: env.CANVAS_HOST?.trim() || '0.0.0.0',
+      /* LOOPBACK BY DEFAULT, deliberately, and this is a reversal of the
+       * earlier default.
+       *
+       * The server now carries a WRITE API (/api/canvases) that has no
+       * authentication yet. A default that publishes an unauthenticated write
+       * API to every interface is the kind of gap that ships by accident and
+       * is only noticed from the outside, so the default is the safe one and
+       * exposure is a stated choice.
+       *
+       * The container is unaffected: Dockerfile and docker-compose.yml both
+       * set CANVAS_HOST=0.0.0.0 explicitly, because an ambient display nobody
+       * can reach from a tablet is not a product. That is exactly the right
+       * shape - a deployment that intends to be reachable says so, and a bare
+       * `node src/server/main.ts` on a laptop or a shared box does not
+       * silently become one.
+       *
+       * The bind address is NOT what protects the API. Because the container
+       * legitimately binds 0.0.0.0, api.ts independently refuses non-loopback
+       * peers on every API route regardless of how the socket is bound; this
+       * default is the second layer, not the only one. */
+      host: env.CANVAS_HOST?.trim() || '127.0.0.1',
       baseUrl: base,
       dataDir: env.CANVAS_DATA_DIR?.trim() || '/data',
       allowedHosts: allowedHosts(env.CANVAS_ALLOWED_HOSTS, base),
+      apiAllowRemote: apiAllowRemoteRaw === 'true',
       homeAssistant: homeAssistant(env, problems),
       photos: photos(env),
       analytics: analyticsRaw === 'off' ? 'off' : 'on',
@@ -187,10 +242,125 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): {
       /* Null means "use the host's zone", which is right for a container that
        * has been given the host's /etc/localtime. */
       timeZone: env.CANVAS_TIMEZONE?.trim() || null,
+      calendars: calendars(env, problems),
+      screenPollSeconds: screenPollSeconds(env.CANVAS_SCREEN_POLL_SECONDS, problems),
     },
     problems,
   };
 }
+
+/* Subscribed ICS calendars from the environment.
+ *
+ * Numbered slots (CANVAS_CALENDAR_1_URL, _2_URL, ...) rather than one
+ * delimited value, because a calendar URL legitimately contains the
+ * characters any delimiter would use, and a household should not have to
+ * escape its own share link.
+ *
+ * The id is derived by hashing the URL, never by exposing it: it must be
+ * stable across restarts so a saved canvas keeps working, and opaque so the
+ * id cannot be turned back into the credential. Truncated to 16 hex chars -
+ * enough that ids do not collide in a household, short enough to read. */
+function calendars(
+  env: NodeJS.ProcessEnv,
+  problems: ConfigProblem[],
+): CalendarSourceConfig[] {
+  const out: CalendarSourceConfig[] = [];
+  for (let i = 1; i <= 16; i++) {
+    const url = env[`CANVAS_CALENDAR_${i}_URL`]?.trim();
+    if (!url) continue;
+
+    /* Refuse plaintext http for a bearer credential. webcal:// is accepted
+     * because it is literally what Apple and Outlook hand a user; it is https
+     * underneath. */
+    const scheme = url.split(':', 1)[0].toLowerCase();
+    if (scheme !== 'https' && scheme !== 'webcal') {
+      /* The message must not quote the value: the value IS the credential,
+       * and this string goes to the startup banner and the logs. */
+      problems.push({
+        key: `CANVAS_CALENDAR_${i}_URL`,
+        message: `must be https:// or webcal:// (a calendar link is a credential); got ${scheme}://`,
+      });
+      continue;
+    }
+
+    const levelRaw = (env[`CANVAS_CALENDAR_${i}_LEVEL`] ?? '').trim().toLowerCase();
+    if (levelRaw !== '' && levelRaw !== 'private' && levelRaw !== 'shared') {
+      problems.push({
+        key: `CANVAS_CALENDAR_${i}_LEVEL`,
+        message: `expected private or shared, got: ${levelRaw}; treating as private`,
+      });
+    }
+
+    const titlesRaw = (env[`CANVAS_CALENDAR_${i}_TITLES`] ?? '').trim().toLowerCase();
+    if (titlesRaw !== '' && titlesRaw !== 'true' && titlesRaw !== 'false') {
+      problems.push({
+        key: `CANVAS_CALENDAR_${i}_TITLES`,
+        message: `expected true or false, got: ${titlesRaw}; treating as false`,
+      });
+    }
+
+    const refreshRaw = (env[`CANVAS_CALENDAR_${i}_REFRESH`] ?? '').trim();
+    let refreshMs = 900_000;
+    if (refreshRaw !== '') {
+      const n = Number(refreshRaw);
+      /* A 5-second poll against someone else's public feed is how a household
+       * gets rate limited, so the floor is enforced rather than suggested. */
+      if (!Number.isFinite(n) || n < 60) {
+        problems.push({
+          key: `CANVAS_CALENDAR_${i}_REFRESH`,
+          message: `expected seconds >= 60, got: ${refreshRaw}; using 900`,
+        });
+      } else {
+        refreshMs = Math.round(n) * 1000;
+      }
+    }
+
+    out.push({
+      id: createHash('sha256').update(url).digest('hex').slice(0, 16),
+      label: env[`CANVAS_CALENDAR_${i}_LABEL`]?.trim() || `Calendar ${i}`,
+      url,
+      /* Default private: the safe level is the one you get by saying nothing. */
+      level: levelRaw === 'shared' ? 'shared' : 'private',
+      showTitles: titlesRaw === 'true',
+      refreshMs,
+    });
+  }
+  return out;
+}
+
+/* How often a paired display re-checks its manifest.
+ *
+ * The bounds are enforced rather than suggested, in both directions and for
+ * different reasons. A one-second floor would be a household of six screens
+ * running a self-inflicted load test against their own server; a day-long
+ * ceiling would mean an edit made at breakfast appears at bedtime, which is
+ * not "edit once, all screens update" in any useful sense. A bad value is a
+ * named problem in the startup banner and the default, never a silent
+ * clamp. */
+function screenPollSeconds(raw: string | undefined, problems: ConfigProblem[]): number {
+  if (raw === undefined || raw.trim() === '') return SCREEN_POLL_DEFAULT_SECONDS;
+  const n = Number(raw.trim());
+  if (!Number.isFinite(n) || n < SCREEN_POLL_MIN_SECONDS || n > SCREEN_POLL_MAX_SECONDS) {
+    problems.push({
+      key: 'CANVAS_SCREEN_POLL_SECONDS',
+      message:
+        `expected ${SCREEN_POLL_MIN_SECONDS}-${SCREEN_POLL_MAX_SECONDS} seconds, got: ${raw}; ` +
+        `using ${SCREEN_POLL_DEFAULT_SECONDS}`,
+    });
+    return SCREEN_POLL_DEFAULT_SECONDS;
+  }
+  return Math.round(n);
+}
+
+/* Restated here rather than imported from screens.ts, because config.ts
+ * deliberately imports nothing from the server's own modules: it is the thing
+ * everything else is configured BY, and a cycle through it is how a config
+ * module ends up half-initialised at import time. The dependency runs the
+ * other way - screens.ts imports these - so there is exactly one definition
+ * and no agreement to maintain. */
+export const SCREEN_POLL_DEFAULT_SECONDS = 60;
+export const SCREEN_POLL_MIN_SECONDS = 5;
+export const SCREEN_POLL_MAX_SECONDS = 3600;
 
 /* Describes what is enabled without ever revealing a secret's value, for the
  * startup banner and a health endpoint. Reporting a token's presence is
@@ -201,7 +371,18 @@ export function describeConfig(config: CanvasConfig): Record<string, string> {
     host: config.host,
     baseUrl: config.baseUrl ?? '(not set - absolute links disabled)',
     dataDir: config.dataDir,
+    /* Labels and count only. The URLs are credentials and never appear in
+     * the banner, /healthz, or any log line. */
+    calendars:
+      config.calendars.length === 0
+        ? '(none)'
+        : config.calendars.map((c) => `${c.label} [${c.level}]`).join(', '),
     allowedHosts: config.allowedHosts.join(', '),
+    /* Stated in the banner and on /healthz because it is the one setting
+     * whose wrong value is invisible from the machine running the server. */
+    canvasApi: config.apiAllowRemote
+      ? 'UNAUTHENTICATED and reachable from the network (CANVAS_API_ALLOW_REMOTE=true)'
+      : 'unauthenticated, loopback-only',
     homeAssistant: config.homeAssistant
       ? `enabled (${config.homeAssistant.url}, token set)`
       : 'disabled',
@@ -212,6 +393,7 @@ export function describeConfig(config: CanvasConfig): Record<string, string> {
       : '(none)',
     photos: config.photos ? 'enabled (key set)' : 'disabled',
     analytics: config.analytics,
+    screenPoll: `${config.screenPollSeconds}s (+/- jitter)`,
     locale: config.locale,
     timeZone: config.timeZone ?? '(host default)',
   };

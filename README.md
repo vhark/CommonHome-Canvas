@@ -14,10 +14,11 @@ threat model. Commercial signage assumes a business that accepts a cloud
 tenancy; a home screen shows who is out, what the family is doing tomorrow,
 and photographs of children, so the content must not leave the building.
 
-That framing also sets the honest limit. Canvas today drives **one** screen
-well. The fleet layer that signage implies — multiple displays managed
-centrally, scheduled rotation, playlists, remote updates — is designed but not
-built. See the status table below.
+That framing also sets the honest limit. Canvas today drives screens from a
+real server with persistence, sharing and a registered-display layer. What is
+still missing is the *editor*: canvases are composed as documents through the
+API, not dragged around in a browser. Loops, schedules and dayparting are
+designed but not built. See the status table below.
 
 Licence: **AGPL-3.0** (`LICENSE` is present in this repository).
 
@@ -28,24 +29,28 @@ Licence: **AGPL-3.0** (`LICENSE` is present in this repository).
 This is an early prototype, not a product. Read this section before evaluating
 anything else in the repository.
 
-What exists today is two things:
+What exists today:
 
 1. **A tested, canonical document and layout model** in `src/canvas/`. This is
    the real core: the portable Canvas document schema, named density levels,
    declared block footprints and a pure, deterministic reflow function. It is
-   covered by 50 passing tests, including property tests. It has **no UI, no
-   editor and no persistence** — it is a model layer.
+   covered by property tests as well as unit tests.
 
-2. **Spikes** in `spikes/`. These are disposable experiments. `spikes/model.ts`
+2. **A dependency-free server** in `src/server/`. Canvas documents persist to
+   disk with atomic writes and optimistic concurrency; share links, passphrase
+   sessions, registered display screens and a settings/credentials surface are
+   implemented and tested.
+
+3. **A shared renderer** in `src/render/`, used by every route so a display, a
+   share link and a preview render the same document the same way.
+
+4. **Spikes** in `spikes/`. These are disposable experiments. `spikes/model.ts`
    states in its first line that it is "Disposable experiment semantics, not
-   the product schema". The grid-engine comparison harness and the ambient
-   screen both live here. The ambient screen is a working prototype that runs
-   on a television; it is still a spike, and it does not use the canonical
-   model in `src/canvas/`.
+   the product schema".
 
-There is no editor, no server, no database, no authentication, no publishing,
-no display pairing and no deployment story yet. Do not run this as a service
-you depend on.
+There is still **no interactive editor**: canvases are created and edited as
+documents through the API, not composed in a browser. Loops, schedules and
+dayparting are not built.
 
 ### Feature status
 
@@ -59,13 +64,19 @@ you depend on.
 | Per-density local overrides, stripped from share exports | **Working** | `src/canvas/document.ts` |
 | Property tests (round-trip, idempotence, containment, preservation) | **Working** | `src/canvas/*.test.ts` |
 | Ambient photo screen with quote, weather and attribution | **Prototype (spike)** | `spikes/ambient*.ts`, `ambient.html` |
-| Server-side adapter holding credentials, shaped snapshot endpoint | **Prototype (spike)** | `vite.ambient.config.ts` |
+| Persistent Canvas documents, atomic writes, optimistic concurrency | **Working** | `src/server/store.ts` |
+| Canvas HTTP API (create, read, update, duplicate) | **Working** | `src/server/api.ts` |
+| Share links with private / link / link+passphrase access levels | **Working** | `src/server/access.ts`, `share.ts` |
+| Registered display screens on stable `/d/<token>` links, offline continuity | **Working** | `src/server/screens.ts`, `display.ts` |
+| Shared Block renderer (clock, calendar, photo, weather, text) | **Working** | `src/render/` |
+| Calendar Blocks from ICS sources, with recurrence expansion | **Working** | `src/calendar/` |
+| Per-field privacy filtering on shared calendar output | **Working** | `src/calendar/shape.ts` |
+| Weather providers — Open-Meteo and met.no keyless, Home Assistant optional | **Working** | `src/providers/` |
+| Settings surface: enable Block types, experimental Blocks, write-only credentials | **Working** | `src/server/settings*.ts`, `credentials.ts` |
 | Grid engine selected (GridStack 13.2.0) | **Decided, not integrated** | see `docs/01-architecture.md` |
 | Interactive editor | **Planned** | — |
-| Persistence, drafts, immutable publishing | **Planned** | — |
-| Registered displays, pairing, offline continuity (the signage "player" layer) | **Planned** | — |
 | Loops and schedules (signage "playlists" and dayparting) | **Planned** | — |
-| Authentication, API surface | **Planned** | — |
+| Administrator authentication | **Planned** | — |
 | Packaging as a container / installable service | **Working** | `Dockerfile`, `docker-compose.yml`, `scripts/install.sh` |
 
 "Working" here means: implemented in this repository and covered by tests you

@@ -105,9 +105,14 @@ echo "==> copied $published files, excluded $skipped"
 echo "==> scanning the published tree"
 
 fail=0
+# scan <label> <pattern> [allowed-file...] — a file named as allowed is dropped
+# from the hit list ONLY if every one of its matching lines also matches that
+# check's reviewed EXEMPT_RE. A real leak landing in an allowlisted file still
+# fails, because the exemption is per-line, not per-file.
 scan() {
-  local label="$1" pattern="$2"
-  local hits
+  local label="$1" pattern="$2"; shift 2
+  local allowed=("$@")
+  local hits kept=""
   # The scanner excludes itself: its own patterns are literal strings like
   # 'ghp_', so scanning them matches every time. A check that always fails
   # gets ignored, and an ignored check protects nothing.
@@ -117,10 +122,27 @@ scan() {
   hits="$(grep -rIlE "$pattern" "$OUT_DIR" \
             --exclude-dir=".git" \
             --exclude="build-public-tree.sh" 2>/dev/null || true)"
-  if [[ -n "$hits" ]]; then
+  while IFS= read -r hit; do
+    [[ -z "$hit" ]] && continue
+    local rel="${hit#"$OUT_DIR"/}" ok=false
+    for a in ${allowed+"${allowed[@]}"}; do
+      if [[ "$rel" == "$a" ]]; then
+        # Every matching line must be explained by the exemption pattern.
+        if [[ -z "$(grep -nIE "$pattern" "$hit" | grep -vIE "$EXEMPT_RE" || true)" ]]; then
+          ok=true
+        fi
+        break
+      fi
+    done
+    $ok || kept+="$hit"$'\n'
+  done <<< "$hits"
+  kept="${kept%$'\n'}"
+  if [[ -n "$kept" ]]; then
     echo "    FAIL: $label"
-    echo "$hits" | sed "s|$OUT_DIR/|      |"
+    echo "$kept" | sed "s|$OUT_DIR/|      |"
     fail=1
+  elif [[ -n "$hits" ]]; then
+    echo "    ok: no $label (reviewed exemptions only)"
   else
     echo "    ok: no $label"
   fi
@@ -131,7 +153,15 @@ scan "developer home paths"  '/home/[a-z]'
 # ranges - reserved precisely so examples can show an address without naming a
 # real host. Flagging them would push authors toward inventing a plausible
 # address instead, which is worse. 192.168.x is still caught.
-scan "private LAN addresses" '\b(10\.[0-9]{1,3}|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}\b'
+# api.test.ts asserts that RFC1918 addresses are REJECTED by
+# isLoopbackAddress(). The addresses are the test's subject matter; deleting
+# them would delete the check that keeps the admin API loopback-only. The
+# exemption is a line shape, so any OTHER RFC1918 address in that same file
+# still fails.
+EXEMPT_RE='isLoopbackAddress|must not be treated as loopback|const bad|::ffff:'
+scan "private LAN addresses" '\b(10\.[0-9]{1,3}|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}\b' \
+     "src/server/api.test.ts"
+EXEMPT_RE=''
 scan "VPN addresses"         '\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b'
 scan "household domains"     '\.wvs\.lol'
 scan "token shapes"          'ghp_|xox[baprs]-|eyJ[A-Za-z0-9_-]{10}'
@@ -147,19 +177,33 @@ scan "personal email"        '[a-z0-9._%+-]+@(gmail|outlook|yahoo|proton|icloud|
 # ignored. Without the file this check is skipped and says so, because a
 # silent skip reads as a pass.
 NAMES_FILE="${CANVAS_PRIVATE_NAMES:-$HOME/.config/commonhome/private-names.txt}"
+# A household first name can legitimately belong to a public figure quoted in
+# the quotations library ("Vince Lombardi", "Serena Williams"). Those lines are
+# exempt; any OTHER line in the same file still fails, so the exemption cannot
+# hide a real leak. The exemption is a line shape, not a blanket file pass.
+NAME_EXEMPT_RE="author: '[A-Z]"
+NAME_ALLOWED=("src/quotes/library.ts" "spikes/quotes.ts")
 if [[ -f "$NAMES_FILE" ]]; then
   while IFS= read -r name; do
     [[ -z "$name" || "$name" == \#* ]] && continue
     # Word-boundary, case-insensitive. Deliberately reports a generic label so
     # this script's own output never prints the private name either.
-    if grep -rIlEi "\\b${name}\\b" "$OUT_DIR" \
-         --exclude-dir=".git" --exclude="build-public-tree.sh" >/dev/null 2>&1; then
+    while IFS= read -r hit; do
+      [[ -z "$hit" ]] && continue
+      rel="${hit#"$OUT_DIR"/}"
+      for a in "${NAME_ALLOWED[@]}"; do
+        if [[ "$rel" == "$a" ]]; then
+          # Every line mentioning the name must be a quotation attribution.
+          if [[ -z "$(grep -nIEi "\\b${name}\\b" "$hit" | grep -vIE "$NAME_EXEMPT_RE" || true)" ]]; then
+            continue 2
+          fi
+        fi
+      done
       echo "    FAIL: a household member name appears in the published tree"
-      grep -rIlEi "\\b${name}\\b" "$OUT_DIR" \
-        --exclude-dir=".git" --exclude="build-public-tree.sh" 2>/dev/null \
-        | sed "s|$OUT_DIR/|      |"
+      echo "      $rel"
       fail=1
-    fi
+    done < <(grep -rIlEi "\\b${name}\\b" "$OUT_DIR" \
+               --exclude-dir=".git" --exclude="build-public-tree.sh" 2>/dev/null || true)
   done < "$NAMES_FILE"
   echo "    ok: name check ran against $NAMES_FILE"
 else
